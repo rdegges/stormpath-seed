@@ -57,6 +57,12 @@ To install **stormpath-seed**, simply run:
 
 This will install the latest version automatically.
 
+.. note::
+    If you get a bunch of random errors and the install can't finish, try
+    installing ``libevent-dev`` using your operating system's package manager.
+    **stormpath-seed** uses `gevent <http://www.gevent.org/>`_ for concurrency,
+    which is why that OS package must be installed.
+
 
 Usage
 -----
