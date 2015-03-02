@@ -43,7 +43,7 @@ Whether you want to create fake users to:
 - Or some other random reason.
 
 **stormpath-seed** makes this process easy!  It creates fake user accounts for
-your, is totally configurable, and is simple to use.  Bam.
+you, is totally configurable, and is simple to use.  Bam.
 
 
 Installation
