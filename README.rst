@@ -1,7 +1,7 @@
 stormpath-seed
 ==============
 
-Do you want to force HTTPs across your Django site? You're in the right place!
+Seed your Stormpath Application with fake user data.
 
 .. image:: https://img.shields.io/pypi/v/stormpath-seed.svg
     :alt: stormpath-seed Release
