@@ -1,3 +1,2 @@
 include README.rst UNLICENSE
-recursive-exclude *.pyc
 recursive-include assets *.png
