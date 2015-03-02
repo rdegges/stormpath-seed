@@ -1,0 +1,294 @@
+#!/usr/bin/env python
+"""
+Stormpath Seed - Seed your Stormpath Application(s) with fake user accounts!
+
+Usage:
+  stormpath-seed
+    [-a <application> | --application <application>]
+    [-i <id> | --api-key-id <id>]
+    [-s <secret> | --api-key-secret <secret>]
+    [-c <concurrency> | --concurrency <concurrency>]
+    [-t <total> | --total-users <total>]
+    [-b <base> | --base-url <base>]
+    [--real-users]
+    [--configure]
+  stormpath-seed -h | --help
+  stormpath-seed --version
+
+Options:
+  -h --help             Show this screen.
+  --version             Show version.
+  -a --application      The Stormpath application to put users into.  If no
+                        application is supplied, 'stormpath-seed' will be used.
+                        NOTE: If the specified application does not exist, it
+                        will be created automatically.
+  -i --api-key-id       The Stormpath API key ID.
+  -s --api-key-secret   The Stormpath API key secret.
+  -c --concurrency      The amount of concurrent users to create (defaults to 5).
+  -t --total-users      The total amount of users to create (defaults to 100).
+  -b --base-url         The base URL to use if you're using a private Stormpath
+                        deployment.
+  --real-users          Seed your Stormpath app with user accounts that look
+                        real.
+  --configure           Configure your seed settings.
+"""
+
+
+from gevent.monkey import patch_all
+patch_all()
+
+from json import dumps, loads
+from os import chmod, environ, makedirs
+from os.path import dirname, exists, expanduser
+from sys import exit
+from time import sleep
+from uuid import uuid4
+
+from docopt import docopt
+from gevent.pool import Pool
+from requests import get
+from stormpath.client import Client
+
+
+VERSION = '0.0.1'
+
+
+class Seeder(object):
+    """The CLI manager."""
+
+    CONFIG_FILE = expanduser('~/.stormpath/seed.json')
+    DEFAULT_APPLICATION_NAME = 'stormpath-seed'
+    DEFAULT_CONCURRENCY = 5
+    DEFAULT_TOTAL_USERS = 100
+
+    def __init__(self, application=None, api_key_id=None, api_key_secret=None, concurrency=5, total_users=100, real_users=False, base_url=None):
+        """Initialize our client, or die trying' >:)"""
+        self.application_name = application
+        self.api_key_id = api_key_id
+        self.api_key_secret = api_key_secret
+        self.concurrency = int(concurrency) if concurrency else self.DEFAULT_CONCURRENCY
+        self.total_users = int(total_users) if total_users else self.DEFAULT_TOTAL_USERS
+        self.real_users = real_users
+        self.base_url = base_url
+
+    def configure(self):
+        """Prompt the user (via the CLI) to configure their seed settings.
+
+        If this fails for some reason, we'll return a user-friendly error
+        message.
+        """
+        print 'Initializing stormpath-seed...\n'
+        print "To get started, we'll need to get your Stormpath API credentials.  Don't have a Stormpath account? Go get one! https://stormpath.com"
+
+        finished = False
+        while not finished:
+            api_key_id = raw_input('Enter your API Key ID: ').strip()
+            api_key_secret = raw_input('Enter your API Key Secret: ').strip()
+            application_name = raw_input('Enter your Application name [defaults to stormpath-seed]: ').strip()
+            if not (api_key_id or api_key_secret):
+                print '\nNot sure how to find your Stormpath API credentials?'
+                print 'Log into your Stormpath account, then click the "Manage API Keys" link.\n'
+
+            if not application_name:
+                print "You didn't specify an application name, so we're using %s as the default!" % self.DEFAULT_APPLICATION_NAME
+                application_name = self.DEFAULT_APPLICATION_NAME
+
+            # Validate the API credentials.
+            client = Client(api_key={
+                'id': api_key_id,
+                'secret': api_key_secret,
+            })
+
+            try:
+                client.applications
+                print '\nSuccessfully initialized stormpath-seed!'
+                print 'Your API credentials are stored in the file:', self.CONFIG_FILE, '\n'
+                print 'Run stormpath-seed -h for usage information.'
+
+                if not exists(dirname(self.CONFIG_FILE)):
+                    makedirs(dirname(file))
+
+                with open(self.CONFIG_FILE, 'wb') as settings_file:
+                    settings_file.write(dumps({
+                        'api-key-id': api_key_id,
+                        'api-key-secret': api_key_secret,
+                        'application-name': application_name,
+                    }, indent=2, separators=(',', ': '), sort_keys=True))
+
+                # Make this settings file only accessible to the current user
+                # -- this safeguards credentials a bit.
+                chmod(self.CONFIG_FILE, 0600)
+
+                finished = True
+            except Exception, e:
+                print 'ERROR:', e
+                exit(1)
+
+    def load_settings(self):
+        """Attempt to load all settings.
+
+        We'll check the following places, in order, for settings:
+
+            1. Environment variables.
+            2. ~/.stormpath/seed.json.
+
+        If we're unable to load settings from either the environment variables
+        or the configuration file, we'll bail out immediately and throw a
+        user-friendly error.
+
+        If things work, we'll return a dictionary that holds all of the
+        settings.  Here's what it'll look like::
+
+            {
+              "application-name": "xxx",
+              "api-key-id": "xxx",
+              "api-key-secret": "xxx"
+            }
+        """
+        self.api_key_id = self.api_key_id if self.api_key_id else environ.get('STORMPATH_API_KEY_ID')
+        self.api_key_secret = self.api_key_secret if self.api_key_secret else environ.get('STORMPATH_API_KEY_SECRET')
+        self.application_name = self.application_name if self.application_name else environ.get('STORMPATH_APPLICATION_NAME', self.DEFAULT_APPLICATION_NAME)
+
+        if not (self.api_key_id and self.api_key_secret and self.application_name):
+            try:
+                settings = open(self.CONFIG_FILE, 'rb').read()
+            except:
+                print 'ERROR: Unable to open the configuration file:', self.CONFIG_FILE
+                exit(1)
+
+            try:
+                settings = loads(settings)
+            except:
+                print 'ERROR: Unable to parse JSON data in the configuration file:', self.CONFIG_FILE
+                exit(1)
+
+            if not settings.get('api-key-id'):
+                print 'ERROR: Missing JSON data "api-key-id" in the configuration file:', self.CONFIG_FILE
+                exit(1)
+
+            if not settings.get('api-key-secret'):
+                print 'ERROR: Missing JSON data "api-key-secret" in the configuration file:', self.CONFIG_FILE
+                exit(1)
+
+            self.api_key_id = settings['api-key-id']
+            self.api_key_secret = settings['api-key-secret']
+            self.application_name = self.application_name if self.application_name else settings.get('application-name', self.DEFAULT_APPLICATION_NAME)
+
+    def get_application(self):
+        """Return the Stormpath Application object to be used during the seeding
+        process.
+
+        If the Application doesn't yet exist, we'll create it.
+        """
+        client = Client(id=self.api_key_id, secret=self.api_key_secret, base_url=self.base_url)
+
+        try:
+            application = client.applications.create({
+                'name': self.application_name,
+                'description': 'This application was generated by the stormpath-seed CLI tool: https://github.com/rdegges/stormpath-seed',
+            }, create_directory=True)
+            print "Application %s didn't exist, created it!" % self.application_name
+        except:
+            try:
+                application = client.applications.search({'name': self.application_name})[0]
+                print 'Successfully found existing Application:', application.name
+            except:
+                print 'Unable to find existing Application:', self.application_name
+                exit(1)
+
+        return application
+
+    def create_account(self, application):
+        """Create a fake user account in the given Application."""
+        finished = False
+
+        while not finished:
+            if not self.real_users:
+                try:
+                    account = application.accounts.create({
+                        'given_name': uuid4().hex,
+                        'surname': uuid4().hex,
+                        'email': uuid4().hex + '@mailinator.com',
+                        'password': uuid4().hex[:20].upper() + uuid4().hex[:20] + '!#',
+                    })
+
+                    print 'Created new user: "%s" "%s" "%s"' % (
+                        account.given_name,
+                        account.surname,
+                        account.email,
+                    )
+
+                    finished = True
+                except KeyboardInterrupt:
+                    exit(0)
+                except Exception, e:
+                    print e
+
+            else:
+                try:
+                    resp = get('http://api.randomuser.me')
+                    if resp.status_code != 200:
+                        raise
+
+                    user = resp.json()['results'][0]['user']
+                    account = application.accounts.create({
+                        'given_name': user['name']['first'].title(),
+                        'surname': user['name']['last'].title(),
+                        'email': user['email'],
+                        'password': uuid4().hex[:20].upper() + uuid4().hex[:20] + '!#',
+                    })
+
+                    print 'Created new user: "%s" "%s" "%s"' % (
+                        account.given_name,
+                        account.surname,
+                        account.email,
+                    )
+
+                    finished = True
+                except KeyboardInterrupt:
+                    exit(0)
+                except Exception, e:
+                    print e
+
+    def seed(self):
+        """Seed the given Stormpath Application with fake accounts."""
+        application = self.get_application()
+
+        print 'Creating %d accounts for application: %s with %d concurrency and %sreal users...' % (self.total_users, application.name, self.concurrency, 'no ' if not self.real_users else '')
+        sleep(10)
+
+        pool = Pool(self.concurrency)
+        for i in xrange(self.total_users):
+            pool.spawn(self.create_account, application)
+
+        pool.join()
+        print 'Finished creating %d users in Application %s!' % (
+            self.total_users,
+            self.application_name,
+        )
+
+
+def main():
+    """Handle user input, then do stuff."""
+    args = docopt(__doc__, version=VERSION)
+
+    seeder = Seeder(
+        application = args['<application>'],
+        api_key_id = args['<id>'],
+        api_key_secret = args['<secret>'],
+        concurrency = args['<concurrency>'],
+        total_users = args['<total>'],
+        base_url = args['<base>'],
+        real_users = args['--real-users'],
+    )
+
+    if args['--configure']:
+        seeder.configure()
+        return
+
+    seeder.load_settings()
+    seeder.seed()
+
+
+if __name__ == '__main__':
+    main()
