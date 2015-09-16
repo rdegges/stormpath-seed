@@ -125,7 +125,7 @@ Lastly, if you're using a private deployment of Stormpath, you can use the
 
 .. code-block::
 
-    $ stormpath-seed --application my-app --total-users 100000 --base-url https://api.myprivateapi.com/v1
+    $ stormpath-seed --application my-app --total-users 100000 --url https://api.myprivateapi.com/v1
 
 Bam.
 
