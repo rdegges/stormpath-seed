@@ -152,6 +152,19 @@ Change Log
 All library changes, in descending order.
 
 
+Version 0.0.2
+*************
+
+**Released September 15, 2015.**
+
+- Fixing bugs with latest release of docopt.
+- Fixing poor --configure handling.
+- Adding support for configuring the Stormpath base URL in the seed.json config
+  file.
+- Fixing small bugs.
+- Adding Travis CI builds.
+
+
 Version 0.0.1
 *************
 
