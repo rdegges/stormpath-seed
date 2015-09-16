@@ -2,35 +2,27 @@
 """
 Stormpath Seed - Seed your Stormpath Application(s) with fake user accounts!
 
-Usage:
-  stormpath-seed
-    [-a <application> | --application <application>]
-    [-i <id> | --api-key-id <id>]
-    [-s <secret> | --api-key-secret <secret>]
-    [-c <concurrency> | --concurrency <concurrency>]
-    [-t <total> | --total-users <total>]
-    [-b <base> | --base-url <base>]
-    [--real-users]
-    [--configure]
-  stormpath-seed -h | --help
-  stormpath-seed --version
+Usage: stormpath-seed [options]
 
 Options:
-  -h --help             Show this screen.
-  --version             Show version.
-  -a --application      The Stormpath application to put users into.  If no
-                        application is supplied, 'stormpath-seed' will be used.
-                        NOTE: If the specified application does not exist, it
-                        will be created automatically.
-  -i --api-key-id       The Stormpath API key ID.
-  -s --api-key-secret   The Stormpath API key secret.
-  -c --concurrency      The amount of concurrent users to create (defaults to 5).
-  -t --total-users      The total amount of users to create (defaults to 100).
-  -b --base-url         The base URL to use if you're using a private Stormpath
-                        deployment.
-  --real-users          Seed your Stormpath app with user accounts that look
-                        real.
-  --configure           Configure your seed settings.
+  -h, --help                        Show this screen.
+  -v, --version                     Show version.
+  --configure                       Configure your settings!
+  -a <app>, --application <app>     The Stormpath application to put users
+                                    into.  If no application is supplied,
+                                    'stormpath-seed' will be used.
+                                    NOTE: If the specified application does not
+                                    exist, it will be created automatically.
+  -i <id>, --id <id>                The Stormpath API key ID.
+  -s <secret>, --secret <secret>    The Stormpath API key secret.
+  -c <con>, --concurrency <con>     The amount of concurrent users to create
+                                    (defaults to 5).
+  -t <num>, --total-users <num>     The total amount of users to create
+                                    (defaults to 100).
+  -u <url>, --url <url>             The base URL to use if you're using a
+                                    private Stormpath deployment.
+  --real-users                      Seed your Stormpath app with user accounts
+                                    that look real.
 """
 
 
@@ -273,12 +265,12 @@ def main():
     args = docopt(__doc__, version=VERSION)
 
     seeder = Seeder(
-        application = args['<application>'],
-        api_key_id = args['<id>'],
-        api_key_secret = args['<secret>'],
-        concurrency = args['<concurrency>'],
-        total_users = args['<total>'],
-        base_url = args['<base>'],
+        application = args['--application'],
+        api_key_id = args['--id'],
+        api_key_secret = args['--secret'],
+        concurrency = args['--concurrency'],
+        total_users = args['--total-users'],
+        base_url = args['--url'],
         real_users = args['--real-users'],
     )
 
