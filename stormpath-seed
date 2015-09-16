@@ -42,7 +42,7 @@ from requests import get
 from stormpath.client import Client
 
 
-VERSION = '0.0.1'
+VERSION = '0.0.2'
 
 
 class Seeder(object):
