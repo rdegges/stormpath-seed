@@ -163,6 +163,7 @@ Version 0.0.2
   file.
 - Fixing small bugs.
 - Adding Travis CI builds.
+- Modifying options to be simpler.
 
 
 Version 0.0.1
