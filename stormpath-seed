@@ -52,6 +52,7 @@ class Seeder(object):
     DEFAULT_APPLICATION_NAME = 'stormpath-seed'
     DEFAULT_CONCURRENCY = 5
     DEFAULT_TOTAL_USERS = 100
+    DEFAULT_URL = 'https://api.stormpath.com/v1'
 
     def __init__(self, application=None, api_key_id=None, api_key_secret=None, concurrency=5, total_users=100, real_users=False, base_url=None):
         """Initialize our client, or die trying' >:)"""
@@ -61,7 +62,7 @@ class Seeder(object):
         self.concurrency = int(concurrency) if concurrency else self.DEFAULT_CONCURRENCY
         self.total_users = int(total_users) if total_users else self.DEFAULT_TOTAL_USERS
         self.real_users = real_users
-        self.base_url = base_url
+        self.base_url = base_url if base_url else self.DEFAULT_URL
 
     def configure(self):
         """Prompt the user (via the CLI) to configure their seed settings.
@@ -77,6 +78,7 @@ class Seeder(object):
             api_key_id = raw_input('Enter your API Key ID: ').strip()
             api_key_secret = raw_input('Enter your API Key Secret: ').strip()
             application_name = raw_input('Enter your Application name [defaults to ' + self.DEFAULT_APPLICATION_NAME + ']: ').strip()
+            base_url = raw_input('Enter your Stormpath URL [defaults to ' + self.DEFAULT_URL + ']: ').strip()
             if not (api_key_id or api_key_secret):
                 print '\nNot sure how to find your Stormpath API credentials?'
                 print 'Log into your Stormpath account, then click the "Manage API Keys" link.\n'
@@ -85,8 +87,11 @@ class Seeder(object):
                 print "You didn't specify an application name, so we're using %s as the default!" % self.DEFAULT_APPLICATION_NAME
                 application_name = self.DEFAULT_APPLICATION_NAME
 
+            if not base_url:
+                base_url = self.DEFAULT_URL
+
             # Validate the API credentials.
-            client = Client(api_key={'id': api_key_id, 'secret': api_key_secret})
+            client = Client(id=api_key_id, secret=api_key_secret, base_url=base_url)
 
             try:
                 client.applications
@@ -95,13 +100,14 @@ class Seeder(object):
                 print 'Run stormpath-seed -h for usage information.'
 
                 if not exists(dirname(self.CONFIG_FILE)):
-                    makedirs(dirname(file))
+                    makedirs(dirname(self.CONFIG_FILE))
 
                 with open(self.CONFIG_FILE, 'wb') as settings_file:
                     settings_file.write(dumps({
                         'api-key-id': api_key_id,
                         'api-key-secret': api_key_secret,
                         'application-name': application_name,
+                        'base-url': base_url,
                     }, indent=2, separators=(',', ': '), sort_keys=True))
 
                 # Make this settings file only accessible to the current user
@@ -131,18 +137,20 @@ class Seeder(object):
             {
               "application-name": "xxx",
               "api-key-id": "xxx",
-              "api-key-secret": "xxx"
+              "api-key-secret": "xxx",
+              "base-url": "xxx"
             }
         """
         self.api_key_id = self.api_key_id if self.api_key_id else environ.get('STORMPATH_API_KEY_ID')
         self.api_key_secret = self.api_key_secret if self.api_key_secret else environ.get('STORMPATH_API_KEY_SECRET')
         self.application_name = self.application_name if self.application_name else environ.get('STORMPATH_APPLICATION_NAME', self.DEFAULT_APPLICATION_NAME)
+        self.base_url = self.base_url if self.base_url else environ.get('STORMPATH_BASE_URL', self.DEFAULT_URL)
 
-        if not (self.api_key_id and self.api_key_secret and self.application_name):
+        if not (self.api_key_id and self.api_key_secret and self.application_name and self.base_url):
             try:
                 settings = open(self.CONFIG_FILE, 'rb').read()
             except:
-                print 'ERROR: Unable to open the configuration file:', self.CONFIG_FILE
+                print 'ERROR: Unable to open the configuration file:', self.CONFIG_FILE + '. You might want to run stormpath-seed --configure to initialize things properly!'
                 exit(1)
 
             try:
@@ -159,9 +167,13 @@ class Seeder(object):
                 print 'ERROR: Missing JSON data "api-key-secret" in the configuration file:', self.CONFIG_FILE
                 exit(1)
 
+            if not settings.get('base-url'):
+                print 'ERROR: Missing JSON data "base-url" in the configuration file:', self.CONFIG_FILE
+
             self.api_key_id = settings['api-key-id']
             self.api_key_secret = settings['api-key-secret']
             self.application_name = self.application_name if self.application_name else settings.get('application-name', self.DEFAULT_APPLICATION_NAME)
+            self.base_url = self.base_url if self.base_url else settings.get('base-url', self.DEFAULT_URL)
 
     def get_application(self):
         """Return the Stormpath Application object to be used during the seeding
