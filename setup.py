@@ -10,7 +10,7 @@ setup(
 
     # Basic package information:
     name = 'stormpath-seed',
-    version = '0.0.2',
+    version = '0.0.3',
     scripts = ['stormpath-seed'],
 
     # Packaging options:
