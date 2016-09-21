@@ -227,11 +227,11 @@ class Seeder(object):
 
             else:
                 try:
-                    resp = get('http://api.randomuser.me')
+                    resp = get('http://randomuser.me/api/')
                     if resp.status_code != 200:
                         raise
 
-                    user = resp.json()['results'][0]['user']
+                    user = resp.json()['results'][0]
                     account = application.accounts.create({
                         'given_name': user['name']['first'].title(),
                         'surname': user['name']['last'].title(),
