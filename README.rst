@@ -152,6 +152,14 @@ Change Log
 All library changes, in descending order.
 
 
+Version 0.0.3
+*************
+
+**Released September 21, 2016.**
+
+- Updating randomuser.me API endpoints to reflect their new API stuff.
+
+
 Version 0.0.2
 *************
 
